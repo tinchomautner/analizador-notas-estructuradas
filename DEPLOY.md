@@ -34,18 +34,18 @@ URL fija 24/7, pero **ojo**: Yahoo Finance suele **bloquear IPs de servidores cl
 que el cuantitativo puede fallar intermitentemente. Sirve para mostrar la herramienta;
 para uso real conviene la Opción A o una fuente de datos paga.
 
-### Pasos
-1. El repo ya tiene un **`Dockerfile`** (con Chromium incluido para el PDF). Ya está en
-   GitHub.
-2. Entrá a <https://render.com> → creá cuenta (gratis) → **New + → Web Service**.
-3. **Conectá** el repo `tinchomautner/analizador-notas-estructuradas`.
-4. Render detecta el `Dockerfile` solo. Runtime: **Docker**. Plan: **Free**.
-5. **Configurá la AI (clave):** en **Environment → Add Environment Variable**:
-   - `OPENAI_API_KEY` = `sk-...` (tu key — se carga acá, NO en el código)
-   - `OPENAI_MODEL` = `gpt-4o`
-   - `LLM_PROVIDER` = `openai`
-6. **Create Web Service** → Render buildea y te da una URL pública
-   (`https://analizador-notas-estructuradas.onrender.com`).
+### Pasos (1 clic con el botón)
+1. Clic en el botón **Deploy to Render** del README (o pegá en el navegador:
+   `https://render.com/deploy?repo=https://github.com/tinchomautner/analizador-notas-estructuradas`).
+   Render lee el `render.yaml` y el `Dockerfile` (con Chromium para el PDF) solo.
+2. Te pide la **`OPENAI_API_KEY`** → pegá tu key. Queda como **secreto en Render, NO en el repo**.
+   (`OPENAI_MODEL=gpt-4o` y `LLM_PROVIDER=openai` ya vienen seteados por el blueprint.)
+3. **Apply / Create** → buildea (~5 min la primera vez) y te da la URL pública
+   `https://analizador-notas-estructuradas.onrender.com`.
+4. **CHEQUEÁ YAHOO FINANCE** (lo que querés saber): abrí
+   `https://<tu-app>.onrender.com/api/diag`:
+   - `"yahoo_finance": {"anda": true, ...}` → el cuantitativo funciona en la nube. 🎉
+   - `"anda": false` (Yahoo bloquea la IP del datacenter) → el cuantitativo fallará; usá la Opción A.
 
 ### Notas
 - La key se carga **solo** en el panel de Render (variables de entorno), nunca en el repo.

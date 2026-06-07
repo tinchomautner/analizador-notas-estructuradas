@@ -95,6 +95,34 @@ async def health():
     }
 
 
+@app.get("/api/diag")
+async def diag():
+    """Diagnóstico: ¿anda Yahoo Finance desde este servidor? (clave para saber si el
+    cuantitativo funciona en un host cloud). Devuelve la IP saliente + un test de descarga."""
+    import time
+    import urllib.request
+
+    out = {"provider": os.getenv("LLM_PROVIDER", "openai").lower(), "llm_ready": _llm_ready()}
+    try:
+        out["ip_publica"] = urllib.request.urlopen("https://api.ipify.org", timeout=6).read().decode()
+    except Exception as e:  # noqa: BLE001
+        out["ip_publica"] = f"n/d ({type(e).__name__})"
+    try:
+        import yfinance as yf
+        t0 = time.time()
+        df = yf.download("AAPL", period="5d", progress=False)
+        ok = df is not None and len(df) > 0
+        out["yahoo_finance"] = {
+            "anda": bool(ok),
+            "filas": int(len(df)) if ok else 0,
+            "ultima_fecha": str(df.index[-1].date()) if ok else None,
+            "segundos": round(time.time() - t0, 1),
+        }
+    except Exception as e:  # noqa: BLE001
+        out["yahoo_finance"] = {"anda": False, "error": f"{type(e).__name__}: {e}"[:300]}
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Parseo del termsheet
 # --------------------------------------------------------------------------- #

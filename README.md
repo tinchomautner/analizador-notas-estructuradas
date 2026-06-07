@@ -7,6 +7,10 @@ termsheet y emitir un **veredicto claro**: ¿conviene o no?
 > El análisis es informativo y **no constituye una recomendación ni asesoramiento de
 > inversión**. La decisión final es del asesor y su cliente.
 
+**Compartir rápido:** doble clic en `Compartir Analizador.bat` → link público.
+**Deploy en la nube:** [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/tinchomautner/analizador-notas-estructuradas)
+(ver [DEPLOY.md](DEPLOY.md); chequeá `/api/diag` para ver si Yahoo Finance anda en el host).
+
 ## Qué hace
 
 Del termsheet a un veredicto en minutos:
