@@ -1,0 +1,15 @@
+# Secretos / config local
+backend/.env
+.env
+
+# Entornos y caché
+.venv/
+__pycache__/
+*.pyc
+
+# Config local del entorno de dev (rutas absolutas de la máquina)
+.claude/
+
+# Sistema
+.DS_Store
+Thumbs.db

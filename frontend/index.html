@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MaximUs · Analizador de Notas Estructuradas</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* MaximUs dark navy + gold */
+    --bg:#0a1322; --bg-2:#0c1730; --sidebar:#0b1426; --panel:#111d33; --panel-2:#16223c;
+    --panel-3:#1b2a48; --border:#1e2d49; --border-2:#28395c;
+    --gold:#c9a24b; --gold-2:#d9b25f; --gold-3:#e6c87f; --gold-soft:rgba(201,162,75,.12);
+    --fg:#e8edf5; --fg-muted:#8b98ad; --fg-subtle:#5f6c80;
+    --pos:#34c08a; --pos-bg:rgba(52,192,138,.12); --neg:#ec5b54; --neg-bg:rgba(236,91,84,.12);
+    --amber:#e0b150; --amber-bg:rgba(224,177,80,.12);
+    --grad-gold:linear-gradient(135deg,#d9b25f 0%,#c9a24b 100%);
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    --head:'Montserrat',var(--sans);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --r:14px; --r-s:9px;
+    --sh1:0 1px 2px rgba(0,0,0,.3); --sh2:0 8px 26px rgba(0,0,0,.34);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
+    font-size:14.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--gold-2);text-decoration:none} a:hover{text-decoration:underline}
+  strong{font-weight:700;color:#f2f5fa}
+
+  /* ---------- layout shell ---------- */
+  .app{display:flex;min-height:100vh}
+  aside.sidebar{width:236px;flex:0 0 236px;background:var(--sidebar);
+    border-right:1px solid var(--border);display:flex;flex-direction:column;
+    padding:22px 0 16px;position:sticky;top:0;height:100vh}
+  .brand{font-family:var(--head);font-weight:600;font-size:24px;letter-spacing:.04em;
+    color:#fff;padding:2px 24px 26px;display:flex;align-items:baseline;gap:0}
+  .brand .u{color:var(--gold-2)}
+  .brand small{font-size:9px;letter-spacing:.34em;color:var(--fg-subtle);
+    font-weight:500;display:block}
+  nav.side{display:flex;flex-direction:column;gap:2px;padding:0 12px;flex:1}
+  .nav-i{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:8px;
+    color:var(--fg-muted);font-size:13.5px;font-weight:500;cursor:default;transition:.13s;white-space:nowrap}
+  .nav-i .ic{width:17px;text-align:center;opacity:.8;font-size:14px}
+  .nav-i:hover{background:rgba(255,255,255,.03);color:var(--fg)}
+  .nav-i.active{background:var(--gold-soft);color:var(--gold-3);font-weight:600;
+    box-shadow:inset 2px 0 0 var(--gold-2)}
+  .nav-sep{height:1px;background:var(--border);margin:12px 18px}
+  .side-foot{padding:0 12px}
+  .side-foot .nav-i.exit{color:var(--gold-2)}
+
+  main.main{flex:1;min-width:0;display:flex;flex-direction:column}
+  header.topbar{display:flex;align-items:center;gap:18px;padding:15px 28px;
+    border-bottom:1px solid var(--border);background:var(--bg-2);position:sticky;top:0;z-index:20}
+  .crumb{font-size:13px;color:var(--fg-muted);display:flex;align-items:center;gap:8px}
+  .crumb b{color:var(--fg);font-weight:600} .crumb .sep{color:var(--fg-subtle)}
+  .crumb .date{color:var(--fg-subtle);font-size:11px;letter-spacing:.04em;text-transform:uppercase;margin-left:6px}
+  .top-search{flex:1;max-width:340px;background:var(--panel);border:1px solid var(--border);
+    border-radius:9px;padding:8px 13px;color:var(--fg-muted);font-size:13px;display:flex;align-items:center;gap:9px}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .chip{width:30px;height:30px;border-radius:8px;background:var(--panel);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--fg-muted)}
+  .user{display:flex;align-items:center;gap:10px}
+  .user .av{width:34px;height:34px;border-radius:50%;background:var(--grad-gold);color:#0a1322;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  .user .nm{font-size:13px;font-weight:600;line-height:1.2} .user .em{font-size:11px;color:var(--fg-subtle)}
+
+  .content{padding:26px 30px 70px;max-width:1180px;width:100%}
+  .page-title{font-family:var(--head);font-size:21px;font-weight:600;color:#fff;margin:0 0 3px;letter-spacing:.01em}
+  .page-sub{color:var(--fg-muted);font-size:13px;margin-bottom:22px}
+
+  /* ---------- generic ---------- */
+  .banner{padding:11px 14px;border-radius:var(--r-s);margin-bottom:16px;font-size:13px;border:1px solid;display:flex;gap:9px;align-items:flex-start}
+  .banner.err{background:var(--neg-bg);border-color:rgba(236,91,84,.4);color:#ffb4af}
+  .banner.ok{background:var(--pos-bg);border-color:rgba(52,192,138,.4);color:#7fe3bf}
+  .banner.warn{background:var(--amber-bg);border-color:rgba(224,177,80,.4);color:#f0d18a}
+  textarea{width:100%;min-height:230px;background:var(--bg-2);color:var(--fg);border:1px solid var(--border);
+    border-radius:var(--r-s);padding:14px;font-size:13px;font-family:var(--mono);resize:vertical}
+  textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  button{cursor:pointer;border:none;border-radius:var(--r-s);padding:11px 18px;font-size:14px;
+    font-weight:600;font-family:inherit;transition:.15s}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primary{background:var(--grad-gold);color:#0a1322}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.07);box-shadow:0 4px 18px rgba(201,162,75,.3)}
+  .btn-ghost{background:var(--panel-2);color:var(--fg);border:1px solid var(--border-2)}
+  .btn-ghost:hover:not(:disabled){border-color:var(--gold);color:var(--gold-2)}
+  .btn-sm{padding:6px 12px;font-size:12.5px}
+  .filelbl{display:inline-flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--border-2);
+    border-radius:var(--r-s);padding:10px 16px;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s}
+  .filelbl:hover{border-color:var(--gold);color:var(--gold-2)}
+  input[type=file]{display:none}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+    margin-bottom:18px;overflow:hidden;box-shadow:var(--sh2)}
+  .card-h{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+    background:var(--bg-2);border-bottom:1px solid var(--border)}
+  .card-h h2{font-family:var(--head);font-size:13px;margin:0;font-weight:600;color:var(--gold-2);
+    letter-spacing:.14em;text-transform:uppercase}
+  .card-b{padding:20px}
+  .pill{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.6px}
+  .pill.pending{background:var(--panel-3);color:var(--fg-muted)}
+  .pill.streaming{background:var(--gold-soft);color:var(--gold-3)}
+  .pill.done{background:var(--pos-bg);color:var(--pos)}
+  .pill.error{background:var(--neg-bg);color:var(--neg)}
+
+  .md{font-size:13.5px;color:var(--fg)}
+  .md h1,.md h2,.md h3{color:#fff;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:5px;margin-top:18px;font-size:15px}
+  .md h3{font-size:14px;border:none}
+  .md strong{color:#fff} .md a{color:var(--gold-2)}
+  .md table{border-collapse:collapse;width:100%;margin:12px 0;font-size:12.5px}
+  .md th,.md td{border:1px solid var(--border);padding:6px 9px;text-align:left}
+  .md th{background:var(--bg-2);color:var(--gold-2);font-weight:700}
+  .md code{background:var(--bg-2);padding:1px 5px;border-radius:4px;font-size:12px;font-family:var(--mono)}
+  .md blockquote{border-left:3px solid var(--gold);margin:10px 0;padding:2px 14px;color:var(--fg-muted)}
+
+  .grid{display:grid;gap:12px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+  .kpi{background:var(--bg-2);border:1px solid var(--border);border-top:2px solid var(--gold);
+    border-radius:var(--r-s);padding:14px 16px}
+  .kpi .lbl{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .kpi .val{font-size:24px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#fff}
+  .kpi .note{font-size:11px;color:var(--fg-subtle);margin-top:3px}
+  table.data{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px;font-variant-numeric:tabular-nums}
+  table.data th,table.data td{border-bottom:1px solid var(--border);padding:7px 9px;text-align:right}
+  table.data th:first-child,table.data td:first-child{text-align:left}
+  table.data th{color:var(--fg-muted);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  table.data tbody tr:hover{background:var(--panel-2)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)}
+  .secT{font-family:var(--head);font-size:10.5px;color:var(--gold-2);text-transform:uppercase;letter-spacing:.18em;margin:22px 0 9px;font-weight:600}
+  .tab{background:var(--panel-2);border:1px solid var(--border-2);color:var(--fg-muted);border-radius:7px;
+    padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;text-transform:none;letter-spacing:0;font-family:var(--sans)}
+  .tab.on{background:var(--gold-soft);color:var(--gold-3);border-color:var(--gold)}
+
+  fieldset{border:1px solid var(--border);border-radius:var(--r-s);padding:14px 16px;margin:0 0 14px;background:var(--bg-2)}
+  legend{color:var(--gold-2);font-size:10.5px;font-weight:700;padding:0 8px;text-transform:uppercase;letter-spacing:.14em;font-family:var(--head)}
+  label.f{display:block;font-size:10px;color:var(--fg-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+  input.f,select.f{width:100%;background:var(--panel);color:var(--fg);border:1px solid var(--border-2);border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit}
+  input.f:focus,select.f:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .sub-row{display:grid;grid-template-columns:1.4fr 1fr 1fr .8fr;gap:8px;margin-bottom:8px;align-items:end}
+  .toolnote{font-size:12px;color:var(--gold-2);font-style:italic;margin:8px 0}
+  .muted{color:var(--fg-muted)} .small{font-size:12px}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg);padding-top:18px}
+  .check input{width:16px;height:16px;accent-color:var(--gold)}
+
+  /* ---------- verdict ---------- */
+  .verdict-hero{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+  .gauge{width:130px;height:130px;flex:0 0 auto}
+  .light{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .lamp{width:24px;height:24px;border-radius:50%;background:#243352;opacity:.3}
+  .lamp.on{opacity:1}
+  .lamp.green.on{background:var(--pos);box-shadow:0 0 16px var(--pos)}
+  .lamp.amber.on{background:var(--amber);box-shadow:0 0 16px var(--amber)}
+  .lamp.red.on{background:var(--neg);box-shadow:0 0 16px var(--neg)}
+  .resumen{background:var(--bg-2);border:1px solid var(--border);border-left:3px solid var(--gold);
+    border-radius:9px;padding:13px 16px;margin:16px 0 2px;font-size:13.5px;color:var(--fg);line-height:1.6}
+  .resumen b{color:var(--gold-2);font-family:var(--head);text-transform:uppercase;letter-spacing:.1em;font-size:11px}
+  .verdict-txt{flex:1;min-width:240px}
+  .verdict-txt .big{font-family:var(--head);font-size:30px;font-weight:700;letter-spacing:.04em}
+  .verdict-txt .one{color:var(--fg-muted);margin-top:4px;font-size:14px}
+  .pilar{margin-top:14px}
+  .pilar-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:5px}
+  .pilar-h .nm{font-weight:600;color:#fff}.pilar-h .nm span{color:var(--fg-subtle);font-weight:500;font-size:11px;margin-left:6px}
+  .pilar-h .sc{font-weight:700;font-variant-numeric:tabular-nums}
+  .track{height:8px;background:var(--bg-2);border-radius:6px;overflow:hidden}
+  .track .fill{height:100%;border-radius:6px}
+  .subs{margin:9px 0 4px;display:grid;gap:5px}
+  .subline{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--fg-muted);
+    padding:5px 10px;background:var(--bg-2);border-radius:7px;border:1px solid var(--border)}
+  .subline .ssc{font-weight:700;font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .subline.clk{cursor:pointer;flex-direction:column;align-items:stretch;transition:border-color .15s}
+  .subline.clk:hover{border-color:var(--gold)}
+  .subline .toprow{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+  .explain{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border-2);font-size:12px;
+    color:var(--fg-muted);line-height:1.6}
+  .caret{color:var(--gold-2);margin-right:6px;font-size:10px}
+  .kpi.clk{cursor:pointer}.kpi.clk:hover{border-top-color:var(--gold-3)}
+  .flag{display:flex;gap:10px;padding:10px 13px;border-radius:9px;margin-bottom:8px;border:1px solid;font-size:13px}
+  .flag.descalificante{background:var(--neg-bg);border-color:rgba(236,91,84,.35)}
+  .flag.alerta{background:var(--amber-bg);border-color:rgba(224,177,80,.32)}
+  .flag .fi{flex:0 0 auto;font-size:15px}
+  .flag .ft b{display:block;color:#fff;font-size:12.5px;margin-bottom:1px}
+  .flag .ft span{color:var(--fg-muted);font-size:12px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .lst{margin:0;padding-left:0;list-style:none;display:grid;gap:7px}
+  .lst li{font-size:13px;display:flex;gap:8px;align-items:flex-start;color:var(--fg)}
+  .lst.good li::before{content:"▲";color:var(--pos);font-size:9px;margin-top:4px}
+  .lst.bad li::before{content:"▼";color:var(--neg);font-size:9px;margin-top:4px}
+  .lst.improve li::before{content:"→";color:var(--gold-2);margin-top:0}
+
+  .cursor{display:inline-block;width:8px;height:15px;background:var(--gold);animation:blink 1s steps(2) infinite;vertical-align:middle;margin-left:2px}
+  @keyframes blink{0%{opacity:1}50%{opacity:0}}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border-2);border-top-color:var(--gold);border-radius:50%;animation:rot .8s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .barwrap{display:flex;align-items:flex-end;gap:2px;height:140px;margin-top:8px}
+  footer{margin-top:34px;color:var(--fg-subtle);font-size:11.5px;text-align:center;border-top:1px solid var(--border);padding-top:16px}
+  @media(max-width:820px){aside.sidebar{display:none}.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const {useState,useRef,useEffect} = React;
+const API = "";
+
+const fmt = (x,d=1)=> (x==null||isNaN(x))?"—":Number(x).toLocaleString("es-UY",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct = (x,d=1)=> (x==null||isNaN(x))?"—":fmt(x,d)+"%";
+const bn = (x)=>{ if(x==null||isNaN(x))return"—"; const a=Math.abs(x);
+  if(a>=1e12)return "$"+(x/1e12).toFixed(2)+" bill."; if(a>=1e9)return "$"+(x/1e9).toFixed(1)+" mil M";
+  if(a>=1e6)return "$"+(x/1e6).toFixed(0)+" M"; return "$"+fmt(x,0); };
+const md = (t)=> ({__html: DOMPurify.sanitize(marked.parse(t||""))});
+// Saca líneas/fragmentos con datos no disponibles para que nunca aparezca "no disponible/omitido/null"
+const cleanNarrative = (t)=>{ if(!t) return t;
+  const bad=/no disponible|omitid|no especifica|\(null\)|:\s*null\b|\bn\/a\b|datos no/i;
+  return t.split("\n").filter(l=>!bad.test(l)).join("\n")
+    .replace(/\s*\((?:omitido|no disponible|null)[^)]*\)/gi,"")
+    .replace(/\n{3,}/g,"\n\n"); };
+const cls = (x)=> x>=0?"pos":"neg";
+const colorFor = (s)=> s>=70?"green":s>=40?"amber":"red";
+const colVar = (s)=> s>=70?"var(--pos)":s>=40?"var(--amber)":"var(--neg)";
+const num = (v)=>{const n=parseFloat(v);return isNaN(n)?null:n;};
+
+/* ==================== charts ==================== */
+function Histogram({data, barrier}){
+  if(!data||!data.counts) return null;
+  const {counts,edges}=data;
+  const max=Math.max(...counts,1), W=560,H=150,pad=22;
+  const bw=(W-pad*2)/counts.length;
+  const xForVal=(v)=>{const min=edges[0],mx=edges[edges.length-1];return pad+(v-min)/(mx-min)*(W-pad*2);};
+  const bx=xForVal(barrier);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto"}}>
+      {counts.map((c,i)=>{const h=(c/max)*(H-pad-14);const x=pad+i*bw,y=H-pad-h;const below=edges[i]<barrier;
+        return <rect key={i} x={x} y={y} width={Math.max(bw-1,1)} height={h} fill={below?"#ec5b54":"#4f7fc4"} opacity="0.9"/>;})}
+      <line x1={bx} y1={6} x2={bx} y2={H-pad} stroke="#d9b25f" strokeWidth="1.5" strokeDasharray="4 3"/>
+      <text x={bx+4} y={16} fill="#d9b25f" fontSize="10" fontWeight="700">Barrera {fmt(barrier,0)}%</text>
+      <line x1={pad} y1={H-pad} x2={W-pad} y2={H-pad} stroke="#1e2d49"/>
+      <text x={pad} y={H-6} fill="#5f6c80" fontSize="9">{fmt(edges[0],0)}%</text>
+      <text x={W-pad} y={H-6} fill="#5f6c80" fontSize="9" textAnchor="end">{fmt(edges[edges.length-1],0)}%</text>
+      <text x={W/2} y={H-6} fill="#5f6c80" fontSize="9" textAnchor="middle">Worst-of al vencimiento</text>
+    </svg>
+  );
+}
+function AutocallChart({rows}){
+  if(!rows||!rows.length) return null;
+  const max=Math.max(...rows.map(r=>r.prob_autocall),1);
+  return (<div className="barwrap">{rows.map((r,i)=>(
+    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+      <div className="small muted">{fmt(r.prob_autocall,0)}%</div>
+      <div style={{width:"70%",background:"#4f7fc4",borderRadius:"3px 3px 0 0",height:`${(r.prob_autocall/max)*100}%`,minHeight:2}}></div>
+      <div className="small muted" style={{fontSize:9}}>{r.fecha}</div>
+    </div>))}</div>);
+}
+function Gauge({score}){
+  const r=52,c=2*Math.PI*r,off=c*(1-score/100),col=colVar(score);
+  return (<svg className="gauge" viewBox="0 0 130 130">
+    <circle cx="65" cy="65" r={r} fill="none" stroke="#1b2a48" strokeWidth="12"/>
+    <circle cx="65" cy="65" r={r} fill="none" stroke={col} strokeWidth="12" strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" transform="rotate(-90 65 65)"/>
+    <text x="65" y="62" textAnchor="middle" fontSize="34" fontWeight="800" fill={col} fontFamily="Montserrat">{score}</text>
+    <text x="65" y="84" textAnchor="middle" fontSize="11" fill="#5f6c80">/ 100</text>
+  </svg>);
+}
+
+function SeriesChart({serie, barrier, ticker}){
+  if(!serie||!serie.niveles?.length||barrier==null) return null;
+  const n=serie.niveles, f=serie.fechas, W=940,H=180,pad=30;
+  const max=Math.max(...n, barrier)*1.06, min=Math.min(...n, barrier, 0)*0.98;
+  const X=i=>pad+i/(Math.max(n.length-1,1))*(W-pad*2);
+  const Y=v=>H-pad-(v-min)/((max-min)||1)*(H-pad-16);
+  const path=n.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  const by=Y(barrier);
+  return (<svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto"}}>
+    <rect x={pad} y={by} width={W-pad*2} height={H-pad-by} fill="#ec5b54" opacity="0.07"/>
+    <line x1={pad} y1={by} x2={W-pad} y2={by} stroke="#ec5b54" strokeWidth="1.2" strokeDasharray="4 3"/>
+    <text x={W-pad} y={by-4} fill="#ec5b54" fontSize="9" textAnchor="end">Barrera {fmt(barrier,0)}%</text>
+    <path d={path} fill="none" stroke="#4f7fc4" strokeWidth="1.6"/>
+    {n.map((v,i)=>v<barrier?<circle key={i} cx={X(i)} cy={Y(v)} r="1.5" fill="#ec5b54"/>:null)}
+    <text x={pad} y={H-8} fill="#5f6c80" fontSize="9">{f[0]}</text>
+    <text x={W-pad} y={H-8} fill="#5f6c80" fontSize="9" textAnchor="end">{f[f.length-1]}</text>
+    <text x={pad} y={13} fill="#e8edf5" fontSize="10.5" fontWeight="700">{ticker}</text>
+    <text x={W-pad} y={13} fill={serie.pct_bajo_barrera>0?"#ec5b54":"#8b98ad"} fontSize="9.5" textAnchor="end">{fmt(serie.pct_bajo_barrera,0)}% del tiempo bajo barrera</text>
+  </svg>);
+}
+
+function DrawdownChart({serie, ticker}){
+  if(!serie||!serie.niveles?.length) return null;
+  const n=serie.niveles, f=serie.fechas, W=940,H=180,pad=30;
+  let peak=-Infinity; const dd=n.map(v=>{peak=Math.max(peak,v); return (v/peak-1)*100;});
+  const minDD=Math.min(...dd,-1), top=pad+12, bot=H-pad;
+  const X=i=>pad+i/Math.max(n.length-1,1)*(W-pad*2);
+  const Y=v=>top+(0-v)/((0-minDD)||1)*(bot-top);
+  const line=dd.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  const area=`M${X(0).toFixed(1)},${Y(0).toFixed(1)} `+dd.map((v,i)=>`L${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")+` L${X(n.length-1).toFixed(1)},${Y(0).toFixed(1)} Z`;
+  const worst=Math.min(...dd);
+  return (<svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto"}}>
+    <path d={area} fill="#ec5b54" opacity="0.12"/>
+    <line x1={pad} y1={Y(0)} x2={W-pad} y2={Y(0)} stroke="#28395c" strokeWidth="1"/>
+    <path d={line} fill="none" stroke="#ec5b54" strokeWidth="1.6"/>
+    <text x={pad} y={13} fill="#e8edf5" fontSize="10.5" fontWeight="700">{ticker} — drawdown</text>
+    <text x={W-pad} y={13} fill="#ec5b54" fontSize="9.5" textAnchor="end">peor caída {fmt(worst,1)}%</text>
+    <text x={pad} y={H-8} fill="#5f6c80" fontSize="9">{f[0]}</text>
+    <text x={W-pad} y={H-8} fill="#5f6c80" fontSize="9" textAnchor="end">{f[f.length-1]}</text>
+  </svg>);
+}
+
+/* ==================== expandable bits ==================== */
+function Subline({s}){
+  const [open,setOpen]=useState(false);
+  const clk=!!s.explicacion;
+  return (
+    <div className={"subline"+(clk?" clk":"")} onClick={()=>clk&&setOpen(o=>!o)}>
+      <div className="toprow">
+        <span>{clk && <span className="caret">{open?"▾":"▸"}</span>}{s.nombre} — {s.detalle}</span>
+        <span className="ssc" style={{color:s.score==null?"var(--fg-subtle)":colVar(s.score)}}>{s.score==null?"n/d":fmt(s.score,0)}</span>
+      </div>
+      {open && s.explicacion && <div className="explain">{s.explicacion}</div>}
+    </div>
+  );
+}
+function RedFlag({f}){
+  const [open,setOpen]=useState(false);
+  const clk=!!f.explicacion;
+  return (
+    <div className={"flag "+f.tipo} onClick={()=>clk&&setOpen(o=>!o)} style={{cursor:clk?"pointer":"default",flexDirection:"column"}}>
+      <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+        <div className="fi">{f.tipo==="descalificante"?"⛔":"⚠"}</div>
+        <div className="ft" style={{flex:1}}><b>{f.nombre} {f.tipo==="descalificante"?"· alerta crítica":"· alerta"}</b><span>{f.detalle}</span></div>
+        {clk && <span className="caret" style={{marginRight:0}}>{open?"▾":"▸"}</span>}
+      </div>
+      {open && f.explicacion && <div className="explain">{f.explicacion}</div>}
+    </div>
+  );
+}
+function Kpi({lbl,val,note,exp}){
+  const [open,setOpen]=useState(false);
+  return (
+    <div className={"kpi"+(exp?" clk":"")} onClick={()=>exp&&setOpen(o=>!o)}>
+      <div className="lbl">{lbl}{exp && <span className="caret" style={{marginLeft:6,marginRight:0}}>{open?"▾":"ⓘ"}</span>}</div>
+      <div className="val">{val}</div>
+      {open && exp ? <div className="explain">{exp}</div> : <div className="note">{note}</div>}
+    </div>
+  );
+}
+
+/* ==================== deterministic verdict ==================== */
+function Verdict({v}){
+  if(!v) return null;
+  const c=colorFor(v.score);
+  return (
+    <div className="card">
+      <div className="card-h"><h2>Veredicto</h2>
+        {v.techo_aplicado!=null && <span className="pill error">Calificación limitada a {v.techo_aplicado} por una alerta crítica</span>}</div>
+      <div className="card-b">
+        <div className="verdict-hero">
+          <Gauge score={v.score}/>
+          <div className="light">
+            <div className={"lamp green"+(c==="green"?" on":"")}></div>
+            <div className={"lamp amber"+(c==="amber"?" on":"")}></div>
+            <div className={"lamp red"+(c==="red"?" on":"")}></div>
+          </div>
+          <div className="verdict-txt">
+            <div className="big" style={{color:colVar(v.score)}}>{v.semaforo}</div>
+            <div className="one">{v.una_linea}</div>
+            {v.nivel_riesgo_nota && <div className="small muted" style={{marginTop:6}}>
+              Riesgo intrínseco de la nota: <strong style={{color:"#fff"}}>{v.nivel_riesgo_nota}</strong> ·
+              puntaje base {fmt(v.score_ponderado,0)}/100</div>}
+          </div>
+        </div>
+
+        {v.resumen && <div className="resumen"><b>Resumen</b><br/>{v.resumen}</div>}
+
+        <div className="secT">Desglose por pilar</div>
+        {(v.pilares||[]).map(p=>(
+          <div className="pilar" key={p.key}>
+            <div className="pilar-h"><div className="nm">{p.nombre}<span>peso {p.peso}%</span></div>
+              <div className="sc" style={{color:colVar(p.score)}}>{fmt(p.score,0)}</div></div>
+            <div className="track"><div className="fill" style={{width:`${p.score}%`,background:colVar(p.score)}}></div></div>
+            <div className="subs">{(p.sub||[]).map((s,i)=><Subline key={i} s={s}/>)}</div>
+          </div>
+        ))}
+
+        {v.red_flags?.length>0 && (<>
+          <div className="secT">Alertas</div>
+          {v.red_flags.map((f,i)=><RedFlag key={i} f={f}/>)}
+        </>)}
+
+        <div className="two-col" style={{marginTop:18}}>
+          {v.fortalezas?.length>0 && <div><div className="secT" style={{marginTop:0}}>Fortalezas de la nota</div>
+            <ul className="lst good">{v.fortalezas.map((x,i)=><li key={i}>{x}</li>)}</ul></div>}
+          {v.debilidades?.length>0 && <div><div className="secT" style={{marginTop:0}}>Debilidades de la nota</div>
+            <ul className="lst bad">{v.debilidades.map((x,i)=><li key={i}>{x}</li>)}</ul></div>}
+        </div>
+
+        {v.que_mejoraria?.length>0 && (<>
+          <div className="secT">Qué mejoraría el veredicto</div>
+          <ul className="lst improve">{v.que_mejoraria.map((x,i)=><li key={i}>{x}</li>)}</ul></>)}
+
+        {v.supuestos?.length>0 && <div className="banner warn" style={{marginTop:16}}>
+          <span>ⓘ</span><div><strong>Supuestos:</strong> {v.supuestos.join(" ")}</div></div>}
+
+        <div className="small muted" style={{marginTop:14}}>
+          Ponderación: Riesgo/Retorno {Math.round((v.config?.pesos_pilares?.riesgo_retorno||0)*100)}% ·
+          Valor relativo {Math.round((v.config?.pesos_pilares?.valor_relativo||0)*100)}% ·
+          Idoneidad {Math.round((v.config?.pesos_pilares?.suitability||0)*100)}%.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== quant panel ==================== */
+function QuantPanel({q}){
+  const [serieTab,setSerieTab]=useState("precio");
+  if(!q) return null;
+  const h=q.historico?.resumen, m=q.montecarlo?.resumen, subs=q.subyacentes||{}, corr=q.correlaciones;
+  const firstAC=q.montecarlo?.autocall_por_fecha?.[0];
+  return (
+    <div className="card">
+      <div className="card-h"><h2>Análisis cuantitativo</h2><span className="pill done">datos {q.meta?.fecha_datos}</span></div>
+      <div className="card-b">
+        {q.warnings?.length>0 && q.warnings.map((w,i)=>(<div key={i} className="banner warn"><span>⚠</span><div>{w}</div></div>))}
+        <div className="grid kpis">
+          <Kpi lbl="Prob. quiebre barrera" val={pct(m?.prob_quiebre_barrera,1)} note={`MC · histórico ${pct(h?.prob_quiebre_barrera,1)}`}
+            exp="Probabilidad estimada por Monte Carlo (10.000 trayectorias) de que el peor subyacente termine por debajo de la barrera de capital al vencimiento. Se muestra junto al método histórico (ventanas móviles) para contrastar."/>
+          <Kpi lbl="Prob. autocall (1ª fecha)" val={firstAC?pct(firstAC.prob_autocall,1):"—"} note={`autocall total ${pct(m?.prob_autocall_total,0)}`}
+            exp="Probabilidad de que la nota se cancele anticipadamente (autocall) en la primera fecha de observación, y en total a lo largo de su vida. Un autocall devuelve el capital antes, con los cupones acumulados."/>
+          <Kpi lbl="Retorno total esperado" val={pct(m?.retorno_total_mediano,1)} note={`media ${pct(m?.retorno_total_media,1)} · p5 ${pct(m?.retorno_total_p5,1)} · anualiz. ${pct(m?.tir_mediana,0)}`}
+            exp="Mediana del retorno total entre 10.000 simulaciones (cupones cobrados + redención final − inversión). 'media' es el promedio, 'p5' el percentil 5 (escenario malo). 'anualiz.' es la TIR anualizada, que en notas de pocos meses se ve exagerada."/>
+          <Kpi lbl="Vida esperada" val={<>{fmt(m?.vida_esperada_anios,2)}<span style={{fontSize:14}}> años</span></>} note={`prob. pérdida ${pct(m?.prob_perdida,1)}`}
+            exp="Tiempo promedio hasta que la nota termina, por autocall o por vencimiento. 'prob. pérdida' es la probabilidad de terminar con pérdida de capital."/>
+        </div>
+        {m?.escenarios?.length>0 && (<>
+          <div className="secT">Escenarios posibles (Monte Carlo)</div>
+          <table className="data">
+            <thead><tr><th>Escenario</th><th>Probabilidad</th><th>Retorno típico</th><th>Barrera</th></tr></thead>
+            <tbody>{m.escenarios.map((e,i)=>(
+              <tr key={i}><td title={e.descripcion}>{e.nombre}</td><td>{pct(e.prob,0)}</td>
+                <td className={cls(e.retorno_tipico_pct)}>{pct(e.retorno_tipico_pct,1)}</td><td>{e.barrera_tocada}</td></tr>))}</tbody>
+          </table>
+          <div className="small muted" style={{marginTop:4}}>Probabilidades calculadas del Monte Carlo; los 3 escenarios son mutuamente excluyentes y suman 100%.</div>
+        </>)}
+
+        <div className="secT">Métricas por subyacente</div>
+        <div style={{overflowX:"auto"}}><table className="data">
+          <thead><tr><th>Ticker</th><th>Precio</th><th>Nivel</th><th>Vol 1a</th><th>Beta</th><th>MaxDD 3a</th><th>Dist. barrera cap.</th></tr></thead>
+          <tbody>{Object.entries(subs).map(([t,s])=>(<tr key={t}><td>{t}</td><td>{fmt(s.precio_actual,2)}</td><td>{pct(s.nivel_actual_pct,0)}</td>
+            <td>{pct(s.vol_1y,1)}</td><td>{s.beta_spx??"—"}</td><td className="neg">{pct(s.max_drawdown_3y,1)}</td>
+            <td className={cls(s.dist_a_barrera_capital_pct)}>{pct(s.dist_a_barrera_capital_pct,1)}</td></tr>))}</tbody>
+        </table></div>
+        {Object.values(subs).some(s=>s.fundamentals && Object.values(s.fundamentals).some(v=>v!=null)) && (<>
+          <div className="secT">Fundamentales (Yahoo Finance)</div>
+          <table className="data">
+            <thead><tr><th>Métrica</th>{Object.keys(subs).map(t=><th key={t}>{t}</th>)}</tr></thead>
+            <tbody>{[
+              ["Sector","sector",v=>v],
+              ["Market cap","market_cap",bn],
+              ["Ingresos (12m)","revenue",bn],
+              ["P/E forward","pe_forward",v=>fmt(v,1)],
+              ["P/E trailing","pe_trailing",v=>fmt(v,1)],
+              ["EV/EBITDA","ev_ebitda",v=>fmt(v,1)],
+              ["PEG","peg",v=>fmt(v,2)],
+              ["Crec. ingresos","crec_ingresos_pct",v=>pct(v,1)],
+              ["Crec. ganancias","crec_ganancias_pct",v=>pct(v,1)],
+              ["Deuda/EBITDA","deuda_ebitda",v=>fmt(v,2)],
+              ["Div. yield","dividend_yield_pct",v=>pct(v,2)],
+            ].filter(([l,k])=>Object.values(subs).some(s=>s.fundamentals?.[k]!=null))
+              .map(([label,key,f],i)=>(
+              <tr key={i}><td>{label}</td>{Object.values(subs).map((s,j)=><td key={j}>{s.fundamentals?.[key]!=null?f(s.fundamentals[key]):"—"}</td>)}</tr>))}</tbody>
+          </table>
+          <div className="small muted" style={{marginTop:4}}>Fuente: Yahoo Finance. Los índices/ETFs pueden no tener todas las métricas.</div>
+        </>)}
+
+        {corr && (<><div className="secT">Correlaciones (5 años)</div>
+          <table className="data"><thead><tr><th></th>{Object.keys(corr).map(k=><th key={k}>{k}</th>)}</tr></thead>
+          <tbody>{Object.entries(corr).map(([a,row])=>(<tr key={a}><td style={{color:"var(--gold-2)",fontWeight:700}}>{a}</td>
+            {Object.keys(corr).map(b=><td key={b}>{fmt(row[b],2)}</td>)}</tr>))}</tbody></table></>)}
+        {q.series_historicas && Object.keys(q.series_historicas).length>0 && (<>
+          <div className="secT" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+            <span>Histórico de subyacentes (backtest, 5 años)</span>
+            <span style={{display:"flex",gap:6}}>
+              <button className={"tab"+(serieTab==="precio"?" on":"")} onClick={()=>setSerieTab("precio")}>Precio vs. barrera</button>
+              <button className={"tab"+(serieTab==="drawdown"?" on":"")} onClick={()=>setSerieTab("drawdown")}>Drawdown</button>
+            </span>
+          </div>
+          <div className="grid" style={{gridTemplateColumns:"1fr",gap:10}}>
+            {Object.entries(q.series_historicas).map(([t,s])=> serieTab==="precio"
+              ? <SeriesChart key={t} serie={s} barrier={q.barreras?.capital?.nivel_pct} ticker={t}/>
+              : <DrawdownChart key={t} serie={s} ticker={t}/>)}
+          </div>
+          <div className="small muted" style={{marginTop:4}}>{serieTab==="precio"
+            ? "Precio de cada subyacente como % de su strike inicial; la línea roja es la barrera de capital y los puntos rojos marcan cuándo estuvo por debajo (habría roto la barrera)."
+            : "Caída desde el máximo previo (drawdown) de cada subyacente; muestra la profundidad histórica de las bajas."}</div>
+        </>)}
+
+        <div className="grid" style={{gridTemplateColumns:"1.3fr 1fr",gap:18,marginTop:18}}>
+          <div><div className="secT">Distribución worst-of al vto (Monte Carlo)</div><Histogram data={q.grafico_worst_of_vto} barrier={q.barreras?.capital?.nivel_pct}/></div>
+          <div><div className="secT">Prob. autocall por fecha (MC)</div><AutocallChart rows={q.montecarlo?.autocall_por_fecha}/></div>
+        </div>
+        <div className="secT">Tabla de payoff a vencimiento</div>
+        <table className="data"><thead><tr><th>Worst-of final</th><th>Inversión directa</th><th>Nota</th><th>Nota supera</th></tr></thead>
+          <tbody>{(q.tabla_payoff||[]).map((r,i)=>(<tr key={i}><td>{pct(r.worst_of_final_pct,0)}</td>
+            <td className={cls(r.retorno_directo_pct)}>{pct(r.retorno_directo_pct,1)}</td>
+            <td className={cls(r.retorno_nota_pct)}>{pct(r.retorno_nota_pct,1)}</td><td>{r.nota_supera?"✓":"—"}</td></tr>))}</tbody></table>
+        <div className="small muted" style={{marginTop:6}}>La columna “Nota” incluye los cupones de la vida remanente (si no rompe la barrera).</div>
+        {q.meta?.seasoned && <div className="banner warn" style={{marginTop:10}}><span>ⓘ</span><div>
+          Nota ya emitida: se valúa la <strong>vida remanente ({fmt(q.meta.vida_remanente_anios,2)} años)</strong> hasta el vencimiento ({q.meta.fecha_vencimiento}), con los niveles actuales relativos al strike original (plazo original {q.meta.plazo_anios}a).</div></div>}
+        <div className="small muted" style={{marginTop:8}}>
+          Horizonte simulado: {fmt(q.meta?.vida_remanente_anios??q.meta?.plazo_anios,2)}a · Histórico: {h?.n_ventanas??"—"} ventanas móviles · Monte Carlo: {fmt(q.meta?.mc_paths,0)} trayectorias GBM (seed {q.meta?.seed}) ·
+          Tasa libre de riesgo 3m: {q.meta?.tasa_libre_riesgo_3m_pct!=null?pct(q.meta.tasa_libre_riesgo_3m_pct,2):"—"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== phase card (LLM, opcional) ==================== */
+function PhaseCard({title,ph,onRetry}){
+  const status=ph?.status||"pending";
+  return (<div className="card">
+    <div className="card-h"><h2>{title}</h2>
+      <span style={{display:"flex",gap:10,alignItems:"center"}}>
+        {status==="error" && <button className="btn-ghost btn-sm" onClick={onRetry}>Reintentar</button>}
+        <span className={"pill "+status}>{status==="streaming"?"generando…":status==="done"?"listo":status==="error"?"error":"pendiente"}</span></span></div>
+    <div className="card-b">
+      {ph?.tool && status==="streaming" && <div className="toolnote">🔎 {ph.tool}</div>}
+      {status==="error" && <div className="banner err">{ph.error}</div>}
+      {ph?.text ? <div className="md" dangerouslySetInnerHTML={md(ph.text)}/>
+        : status==="pending" ? <div className="muted small">Esperando…</div>
+        : status==="streaming" ? <div className="muted small"><span className="spin"></span> Iniciando…</div> : null}
+      {status==="streaming" && ph?.text && <span className="cursor"></span>}
+    </div></div>);
+}
+
+/* ==================== review: términos + perfil ==================== */
+function ReviewForm({terms,setTerms,profile,setProfile,credito,setCredito,onConfirm,onBack}){
+  const t=terms;
+  const set=(path,val)=>{const nt=JSON.parse(JSON.stringify(t));let o=nt;const ks=path.split(".");
+    for(let i=0;i<ks.length-1;i++) o=o[ks[i]]=o[ks[i]]??{};o[ks[ks.length-1]]=val;setTerms(nt);};
+  const setSub=(i,k,v)=>{const nt=JSON.parse(JSON.stringify(t));nt.subyacentes[i][k]=v;setTerms(nt);};
+  const setP=(k,v)=>setProfile({...profile,[k]:v});
+  const setC=(k,v)=>setCredito({...credito,[k]:v});
+  const cup=t.cupon||{},bar=t.barrera_capital||{},ac=t.autocall||{};
+  return (
+    <div className="card">
+      <div className="card-h"><h2>Revisá términos, emisor y perfil</h2>
+        <button className="btn-ghost btn-sm" onClick={onBack}>← Volver</button></div>
+      <div className="card-b">
+        {t.campos_ambiguos?.length>0 && <div className="banner warn"><span>⚠</span><div>Campos a confirmar: {t.campos_ambiguos.join(", ")}</div></div>}
+
+        <fieldset><legend>Subyacentes (verificá el ticker de Yahoo Finance)</legend>
+          <div className="sub-row" style={{fontSize:10,color:"var(--fg-subtle)",marginBottom:4}}>
+            <div>Nombre / ticker</div><div>Ticker Yahoo</div><div>Strike inicial (opc.)</div><div>Lógica</div></div>
+          {(t.subyacentes||[]).map((s,i)=>(<div className="sub-row" key={i}>
+            <input className="f" value={s.nombre||s.ticker||""} onChange={e=>setSub(i,"nombre",e.target.value)}/>
+            <input className="f" value={s.ticker_yf||s.ticker||""} onChange={e=>setSub(i,"ticker_yf",e.target.value)}/>
+            <input className="f" value={s.strike_inicial??""} placeholder="auto" onChange={e=>setSub(i,"strike_inicial",num(e.target.value))}/>
+            <select className="f" value={t.logica_basket||"worst-of"} onChange={e=>set("logica_basket",e.target.value)}>
+              <option>worst-of</option><option>best-of</option><option>average</option><option>single</option></select></div>))}
+        </fieldset>
+
+        <fieldset><legend>Nota</legend><div className="fgrid">
+          <div><label className="f">Tipo</label><input className="f" value={t.tipo_nota||""} onChange={e=>set("tipo_nota",e.target.value)}/></div>
+          <div><label className="f">Plazo (años)</label><input className="f" value={t.plazo_anios??""} onChange={e=>set("plazo_anios",num(e.target.value))}/></div>
+          <div><label className="f">Moneda</label><input className="f" value={t.moneda||""} onChange={e=>set("moneda",e.target.value)}/></div>
+          <div><label className="f">Fecha strike</label><input className="f" value={t.fecha_strike||""} placeholder="YYYY-MM-DD" onChange={e=>set("fecha_strike",e.target.value)}/></div>
+          <div><label className="f">Vencimiento</label><input className="f" value={t.fecha_vencimiento||""} placeholder="YYYY-MM-DD" onChange={e=>set("fecha_vencimiento",e.target.value)}/></div>
+          <div><label className="f">Cupón anual (fracción)</label><input className="f" value={cup.tasa_anual??""} onChange={e=>set("cupon.tasa_anual",num(e.target.value))}/></div>
+          <div><label className="f">Frecuencia cupón</label><select className="f" value={cup.frecuencia||"trimestral"} onChange={e=>set("cupon.frecuencia",e.target.value)}>
+            <option>mensual</option><option>trimestral</option><option>semestral</option><option>anual</option></select></div>
+          <div><label className="f">Tipo cupón</label><select className="f" value={cup.tipo||"condicional"} onChange={e=>set("cupon.tipo",e.target.value)}>
+            <option>fijo</option><option>condicional</option><option>memoria</option></select></div>
+          <div><label className="f">Barrera cupón (fracción)</label><input className="f" value={cup.barrera_cupon_pct??""} onChange={e=>set("cupon.barrera_cupon_pct",num(e.target.value))}/></div>
+          <div><label className="f">Barrera capital (fracción)</label><input className="f" value={bar.nivel_pct??""} onChange={e=>set("barrera_capital.nivel_pct",num(e.target.value))}/></div>
+          <div><label className="f">Tipo barrera</label><select className="f" value={bar.tipo||"europea"} onChange={e=>set("barrera_capital.tipo",e.target.value)}>
+            <option>europea</option><option>americana</option></select></div>
+          <div><label className="f">¿Autocall?</label><select className="f" value={ac.tiene?"si":"no"} onChange={e=>set("autocall.tiene",e.target.value==="si")}>
+            <option value="si">sí</option><option value="no">no</option></select></div>
+          <div><label className="f">Nivel autocall (fracción)</label><input className="f" value={ac.nivel_autocall_pct??""} onChange={e=>set("autocall.nivel_autocall_pct",num(e.target.value))}/></div>
+          <div><label className="f">Capital protegido (fracción, opc.)</label><input className="f" value={t.capital_protegido_pct??""} placeholder="ninguno" onChange={e=>set("capital_protegido_pct",num(e.target.value))}/></div>
+        </div></fieldset>
+
+        <fieldset><legend>Emisor (crédito) — afecta el veredicto</legend><div className="fgrid">
+          <div><label className="f">Emisor</label><input className="f" value={t.emisor||""} onChange={e=>set("emisor",e.target.value)}/></div>
+          <div><label className="f">Rating (S&P/Moody's)</label><input className="f" value={credito.rating||""} placeholder="ej. A, BBB+, BB" onChange={e=>setC("rating",e.target.value)}/></div>
+          <div><label className="f">CDS (bps, opc.)</label><input className="f" value={credito.cds_bps??""} placeholder="ej. 80" onChange={e=>setC("cds_bps",num(e.target.value))}/></div>
+          <div className="check"><input type="checkbox" checked={!!credito.cotiza_secundario} onChange={e=>setC("cotiza_secundario",e.target.checked)}/>Cotiza en secundario</div>
+        </div></fieldset>
+
+        <fieldset><legend>Perfil del cliente — idoneidad</legend><div className="fgrid">
+          <div><label className="f">Perfil de riesgo</label><select className="f" value={profile.perfil_riesgo||"moderado"} onChange={e=>setP("perfil_riesgo",e.target.value)}>
+            <option>conservador</option><option>moderado</option><option>agresivo</option></select></div>
+          <div><label className="f">Horizonte (años)</label><input className="f" value={profile.horizonte_anios??""} onChange={e=>setP("horizonte_anios",num(e.target.value))}/></div>
+          <div><label className="f">% de la cartera</label><input className="f" value={profile.pct_cartera??""} placeholder="ej. 8" onChange={e=>setP("pct_cartera",num(e.target.value))}/></div>
+          <div className="check"><input type="checkbox" checked={!!profile.necesita_liquidez} onChange={e=>setP("necesita_liquidez",e.target.checked)}/>Necesita liquidez</div>
+        </div></fieldset>
+
+        <div className="row"><button className="btn-primary" onClick={onConfirm}>Calcular veredicto →</button></div>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== app ==================== */
+const TITLES={1:"Fase 1 — Subyacentes",2:"Fase 2 — Barreras y probabilidades",3:"Fase 3 — Escenarios y payoff",4:"Fase 4 — Lectura del PM"};
+const BLANK_TERMS={tipo_nota:"Autocallable Phoenix",emisor:"",garante:"",rating_emisor:"",fecha_strike:null,fecha_vencimiento:null,moneda:"USD",plazo_anios:2,
+  subyacentes:[{nombre:"S&P 500",ticker_yf:"^GSPC",strike_inicial:null}],logica_basket:"single",
+  cupon:{tasa_anual:0.10,frecuencia:"trimestral",tipo:"condicional",barrera_cupon_pct:0.70},
+  autocall:{tiene:true,nivel_autocall_pct:1.0,step_down:null},
+  barrera_capital:{tipo:"europea",nivel_pct:0.60},capital_protegido_pct:null,campos_ambiguos:[]};
+const NAV=[["▦","Resumen"],["▤","Portafolios"],["▣","Fondos y ETFs"],["◈","Bonos"],["◉","Acciones"],
+  ["⬡","Activos Privados"],["★","Monitoreo"],["▦","Notas Estructuradas",true],["▥","Informes"]];
+
+function App(){
+  const [step,setStep]=useState("input");
+  const [termsheet,setTermsheet]=useState("");
+  const [terms,setTerms]=useState(null);
+  const [profile,setProfile]=useState({perfil_riesgo:"moderado",horizonte_anios:null,pct_cartera:null,necesita_liquidez:false});
+  const [credito,setCredito]=useState({rating:"",cds_bps:null,yield_ref_pct:null,cotiza_secundario:false});
+  const [quant,setQuant]=useState(null);
+  const [verdict,setVerdict]=useState(null);
+  const [phases,setPhases]=useState({});
+  const [showLLM,setShowLLM]=useState(false);
+  const [clientLogo,setClientLogo]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [llmReady,setLlmReady]=useState(true);
+  const [provider,setProvider]=useState("openai");
+  const priorRef=useRef({});
+
+  useEffect(()=>{ fetch(API+"/api/health").then(r=>r.json()).then(d=>{setLlmReady(d.llm_ready);if(d.provider)setProvider(d.provider);}).catch(()=>{}); },[]);
+  const upPhase=(n,patch)=>setPhases(p=>({...p,[n]:{...(p[n]||{}),...(typeof patch==="function"?patch(p[n]||{}):patch)}}));
+
+  async function doParse(){
+    setError("");setBusy(true);
+    try{
+      const r=await fetch(API+"/api/parse",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({termsheet})});
+      if(!r.ok) throw new Error((await r.json()).detail||"error");
+      const t=await r.json();setTerms(t);
+      if(t.rating_emisor){const m=String(t.rating_emisor).match(/[A-D]{1,3}[+-]?/);if(m)setCredito(c=>({...c,rating:m[0]}));}
+      setStep("review");
+    }catch(e){ setError("No se pudo leer el termsheet: "+e.message+(llmReady?"":" (la lectura automática no está disponible)")); }
+    setBusy(false);
+  }
+  async function uploadPdf(file){
+    setError("");setBusy(true);
+    try{ const fd=new FormData();fd.append("file",file);
+      const r=await fetch(API+"/api/pdf-text",{method:"POST",body:fd});
+      if(!r.ok) throw new Error((await r.json()).detail||"error");
+      setTermsheet((await r.json()).text);
+    }catch(e){ setError("PDF: "+e.message); }
+    setBusy(false);
+  }
+  async function runAnalysis(){
+    setStep("results");setBusy(true);setError("");setVerdict(null);setQuant(null);setShowLLM(false);setPhases({});
+    try{
+      const r=await fetch(API+"/api/quant",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({terms})});
+      if(!r.ok) throw new Error((await r.json()).detail||"error en cuantitativo");
+      const q=await r.json();setQuant(q);
+      const rv=await fetch(API+"/api/verdict",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({terms,quant:q,profile,credito})});
+      if(!rv.ok) throw new Error((await rv.json()).detail||"error en veredicto");
+      setVerdict(await rv.json());
+    }catch(e){ setError(e.message); }
+    setBusy(false);
+  }
+  function parseVeredicto(text){const m=text.match(/@@VEREDICTO:\s*(\{.*?\})/s);if(m){try{return{body:text.replace(m[0],"").trim()};}catch(_){}}return{body:text};}
+  async function runPhase(n,prior){
+    upPhase(n,{status:"streaming",text:"",error:null,tool:null});let full="";
+    try{
+      const r=await fetch(API+"/api/phase",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phase:n,termsheet,terms,quant,prior,verdict})});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const reader=r.body.getReader();const dec=new TextDecoder();let buf="";
+      while(true){const {done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});
+        const segs=buf.split("\n\n");buf=segs.pop();
+        for(const seg of segs){const line=seg.trim();if(!line.startsWith("data:"))continue;
+          const ev=JSON.parse(line.slice(5).trim());
+          if(ev.kind==="text"){full+=ev.data;upPhase(n,{text:n===4?parseVeredicto(full).body:full});}
+          else if(ev.kind==="tool"){upPhase(n,{tool:ev.data});}else if(ev.kind==="error"){throw new Error(ev.data);}}}
+      const finalTxt=cleanNarrative(n===4?parseVeredicto(full).body:full);
+      upPhase(n,{status:"done",tool:null,text:finalTxt});return finalTxt;
+    }catch(e){ upPhase(n,{status:"error",error:e.message});throw e; }
+  }
+  async function runNarrative(){
+    setShowLLM(true);setPhases({1:{status:"pending"},2:{status:"pending"},3:{status:"pending"},4:{status:"pending"}});priorRef.current={};
+    try{ for(const n of [1,2,3,4]){const txt=await runPhase(n,{...priorRef.current});priorRef.current[n]=txt;} }catch(e){ setError(e.message); }
+  }
+  async function retry(n){
+    const prior={};for(let i=1;i<n;i++) if(priorRef.current[i]) prior[i]=priorRef.current[i];
+    try{ const txt=await runPhase(n,prior);priorRef.current[n]=txt;
+      for(const k of [n+1,n+2,n+3].filter(x=>x<=4)){const t=await runPhase(k,{...priorRef.current});priorRef.current[k]=t;} }catch(e){}
+  }
+  function loadLogo(file){ const rd=new FileReader(); rd.onload=()=>setClientLogo(rd.result); rd.readAsDataURL(file); }
+  async function downloadPDF(){
+    setBusy(true); setError("");
+    try{
+      let narrative_html="";
+      if(showLLM){
+        narrative_html=[1,2,3,4].map(n=>phases[n]?.text?`<div class="fase"><div class="fase-title">${TITLES[n]}</div>`+DOMPurify.sanitize(marked.parse(phases[n].text))+`</div>`:"").join("");
+      }
+      const r=await fetch(API+"/api/report",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({terms,quant,verdict,narrative_html,logo:clientLogo})});
+      if(!r.ok){ let m="error"; try{m=(await r.json()).detail;}catch(_){} throw new Error(m); }
+      const blob=await r.blob();
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+      a.download="analisis_nota_"+(quant?.meta?.tickers?.join("_")||"nota")+".pdf"; a.click();
+    }catch(e){ setError("No se pudo exportar el PDF: "+e.message); }
+    setBusy(false);
+  }
+  function downloadJSON(){
+    const out={generado:new Date().toISOString(),termsheet,terminos:terms,perfil:profile,credito,cuantitativo:quant,veredicto:verdict,
+      fases:Object.fromEntries(Object.entries(phases).map(([k,v])=>[k,v.text]))};
+    const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="veredicto_"+(quant?.meta?.tickers?.join("_")||"nota")+".json";a.click();
+  }
+
+  const hoy=new Date().toLocaleDateString("es-UY",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <div className="brand">Maxim<span className="u">U</span>s</div>
+        <nav className="side">
+          {NAV.map(([ic,label,active],i)=>(<div key={i} className={"nav-i"+(active?" active":"")}><span className="ic">{ic}</span>{label}</div>))}
+        </nav>
+        <div className="nav-sep"></div>
+        <div className="side-foot">
+          <div className="nav-i"><span className="ic">⚙</span>Configuración</div>
+          <div className="nav-i"><span className="ic">?</span>Ayuda y Soporte</div>
+          <div className="nav-i exit"><span className="ic">⇥</span>Salir</div>
+        </div>
+      </aside>
+
+      <main className="main">
+        <header className="topbar">
+          <div className="crumb">▦ <b>Panel de control</b> <span className="sep">›</span> Notas Estructuradas
+            <span className="date">{hoy}</span></div>
+          <div className="top-search">🔍 Buscar nota o emisor…</div>
+          <div className="top-right">
+            <div className="chip">🇪🇸</div><div className="chip">🔔</div>
+            <div className="user"><div className="av">MM</div>
+              <div><div className="nm">Martín Mautner</div><div className="em">martinmautner@gmail.com</div></div></div>
+          </div>
+        </header>
+
+        <div className="content">
+          <h1 className="page-title">Analizador de Notas Estructuradas</h1>
+          <div className="page-sub">De la nota a un veredicto claro en minutos · riesgo de quiebre, retorno e idoneidad para tu cliente · <strong>¿conviene o no?</strong></div>
+
+          {!llmReady && <div className="banner warn"><span>ⓘ</span><div>La lectura automática del termsheet no está disponible en este momento. Podés cargar la nota manualmente; el veredicto funciona igual.</div></div>}
+          {error && <div className="banner err"><span>⛔</span><div>{error}</div></div>}
+
+          {step==="input" && (
+            <div className="card"><div className="card-b">
+              <textarea placeholder="Pegá el texto del termsheet de la nota (o subí el PDF abajo)…" value={termsheet} onChange={e=>setTermsheet(e.target.value)}/>
+              <div className="row">
+                <button className="btn-primary" disabled={busy||!termsheet.trim()} onClick={doParse}>{busy?<span className="spin"></span>:"Leer termsheet →"}</button>
+                <label className="filelbl">📄 Subir PDF<input type="file" accept="application/pdf" onChange={e=>e.target.files[0]&&uploadPdf(e.target.files[0])}/></label>
+                <button className="btn-ghost" onClick={()=>{setTerms(JSON.parse(JSON.stringify(BLANK_TERMS)));setStep("review");}}>✎ Cargar la nota manualmente</button>
+              </div>
+            </div></div>
+          )}
+
+          {step==="review" && terms && (
+            <ReviewForm terms={terms} setTerms={setTerms} profile={profile} setProfile={setProfile}
+              credito={credito} setCredito={setCredito} onConfirm={runAnalysis} onBack={()=>setStep("input")}/>
+          )}
+
+          {step==="results" && (<>
+            {!quant && <div className="card"><div className="card-b muted"><span className="spin"></span> Descargando datos de mercado y corriendo el cuantitativo…</div></div>}
+            <Verdict v={verdict}/>
+            <QuantPanel q={quant}/>
+            {verdict && !showLLM && (
+              <div className="card"><div className="card-b" style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                <div><strong>Informe ampliado (opcional)</strong><div className="small muted">Suma un análisis cualitativo de los subyacentes, las barreras y los escenarios de la nota.</div></div>
+                <button className="btn-ghost" disabled={!llmReady||busy} onClick={runNarrative}>✨ Ampliar análisis</button></div></div>
+            )}
+            {showLLM && <div className="banner warn"><span>ⓘ</span><div>El informe ampliado usa <strong>búsqueda web en vivo</strong> para precios, fundamentals y noticias recientes, citando la fuente con su fecha. Aun así, conviene revisar las fuentes antes de usarlo con un cliente.</div></div>}
+            {showLLM && [1,2,3,4].map(n=><PhaseCard key={n} title={TITLES[n]} ph={phases[n]} onRetry={()=>retry(n)}/>)}
+            <div className="row">
+              <button className="btn-primary" onClick={downloadPDF} disabled={!verdict||busy}>{busy?<span className="spin"></span>:"⬇ Exportar PDF"}</button>
+              <button className="btn-ghost" onClick={()=>{setStep("input");setPhases({});setVerdict(null);setQuant(null);setShowLLM(false);}}>Analizar otra nota</button>
+            </div>
+          </>)}
+
+          <footer>Herramienta de apoyo para asesores. El análisis es informativo y no constituye una recomendación ni asesoramiento de inversión; la decisión final es del asesor y su cliente.</footer>
+        </div>
+      </main>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
