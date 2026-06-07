@@ -16,10 +16,18 @@ from pathlib import Path
 
 _CHROME_CANDIDATES = [
     os.getenv("CHROME_PATH", ""),
+    # Windows
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    # Linux (hosting / Docker)
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    # Mac
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ]
 
 
@@ -122,7 +130,7 @@ def _histogram_svg(g, barrier):
     mn, mxe = edges[0], edges[-1]
     bx = pad + (barrier - mn) / (mxe - mn) * (W - pad * 2) if (mxe > mn and barrier is not None) else pad
     return (
-        f'<svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" style="width:100%;height:46mm;display:block">{bars}'
+        f'<svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" style="width:100%;height:40mm;display:block">{bars}'
         f'<line x1="{bx:.1f}" y1="6" x2="{bx:.1f}" y2="{H-pad}" stroke="#b88a2f" stroke-width="1.5" stroke-dasharray="4 3"/>'
         f'<text x="{bx+4:.1f}" y="16" fill="#b88a2f" font-size="10" font-weight="700">Barrera {_num(barrier,0)}%</text>'
         f'<text x="{W/2}" y="{H-6}" fill="#5d6e80" font-size="9" text-anchor="middle">Worst-of al vencimiento</text></svg>'
@@ -145,7 +153,7 @@ def _series_svg(serie, barrier, ticker):
     pts = "".join(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="1.4" fill="#c0413a"/>' for i, v in enumerate(n) if v < barrier)
     bajo = serie.get("pct_bajo_barrera", 0) or 0
     return (
-        f'<svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" style="width:100%;height:82mm;display:block">'
+        f'<svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" style="width:100%;height:70mm;display:block">'
         f'<rect x="{pad}" y="{by:.1f}" width="{W-pad*2}" height="{H-pad-by:.1f}" fill="#c0413a" opacity="0.06"/>'
         f'<line x1="{pad}" y1="{by:.1f}" x2="{W-pad}" y2="{by:.1f}" stroke="#c0413a" stroke-width="1.2" stroke-dasharray="4 3"/>'
         f'<text x="{W-pad}" y="{by-4:.1f}" fill="#c0413a" font-size="9" text-anchor="end">Barrera {_num(barrier,0)}%</text>'
@@ -350,6 +358,8 @@ table.data th:first-child,table.data td:first-child{{text-align:left}}
  padding:6px 12px;border-radius:5px;font-size:11pt;font-weight:600;margin:0 0 9px;letter-spacing:.06em}}
 .md table,table.data,.pilar,.kpis,.cols3{{page-break-inside:avoid}}
 .md h1,.md h2,.md h3{{page-break-after:avoid}}
+.subt{{page-break-after:avoid}}
+.block{{page-break-inside:avoid;margin:0 0 8px}}
 </style></head><body>
 <div class="runfoot">MaximUs · Análisis de Nota Estructurada · {_esc(nombres)}</div>
 
@@ -392,14 +402,19 @@ table.data th:first-child,table.data td:first-child{{text-align:left}}
   {seasoned_note}
   <div class="kpis">{kpi_html}</div>
   <div class="cols">
-    <div class="col">{esc_tbl}<div class="subt">Métricas por subyacente</div>{sub_tbl}</div>
-    <div class="col">{fund_tbl}</div>
+    <div class="col block">{esc_tbl}</div>
+    <div class="col block">{fund_tbl}</div>
   </div>
+</div>
+
+<div class="page">
+  <div class="sec">Análisis cuantitativo · distribución y payoff</div>
   <div class="cols">
-    <div class="col"><div class="subt">Distribución worst-of al vencimiento (Monte Carlo)</div>
+    <div class="col block"><div class="subt">Métricas por subyacente</div>{sub_tbl}</div>
+    <div class="col block"><div class="subt">Distribución worst-of al vencimiento (Monte Carlo)</div>
       {_histogram_svg(quant.get("grafico_worst_of_vto"), (quant.get("barreras",{}).get("capital",{}) or {}).get("nivel_pct"))}</div>
-    <div class="col"><div class="subt">Tabla de payoff a vencimiento</div>{payoff_tbl}</div>
   </div>
+  <div class="block"><div class="subt">Tabla de payoff a vencimiento</div>{payoff_tbl}</div>
   <div class="foot">Cuantitativo con datos de Yahoo Finance ({_esc(fecha)}) · Monte Carlo {_esc(meta.get("mc_paths"))} trayectorias.
   Ponderación: Riesgo/Retorno {int(pp.get("riesgo_retorno",0)*100)}% · Valor relativo {int(pp.get("valor_relativo",0)*100)}% · Idoneidad {int(pp.get("suitability",0)*100)}%.</div>
 </div>
@@ -422,8 +437,8 @@ def render_pdf(html: str) -> bytes:
     try:
         url = "file:///" + str(html_path).replace("\\", "/")
         subprocess.run(
-            [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
-             "--run-all-compositor-stages-before-draw", "--virtual-time-budget=4000",
+            [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
+             "--no-pdf-header-footer", "--run-all-compositor-stages-before-draw", "--virtual-time-budget=4000",
              f"--print-to-pdf={pdf_path}", url],
             check=True, timeout=90,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
