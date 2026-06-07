@@ -10,18 +10,15 @@ es el **Opción A (túnel)**. Para una URL permanente, la **Opción B (nube)**.
 La app corre **en tu máquina** (donde Yahoo Finance y Chrome funcionan bien) y un túnel
 le da una **URL pública** para compartir. Ideal para que alguien lo revise.
 
-### Pasos
-1. **Levantá la app** local: doble clic en `Iniciar Analizador.bat` (queda en
-   `http://127.0.0.1:8742`).
-2. **Instalá cloudflared** (una vez): bajalo de
-   <https://github.com/cloudflare/cloudflared/releases> (`cloudflared-windows-amd64.exe`),
-   renombralo `cloudflared.exe`.
-3. **Abrí el túnel** (en otra terminal):
-   ```
-   cloudflared tunnel --url http://127.0.0.1:8742
-   ```
-4. Te imprime una URL tipo `https://algo-al-azar.trycloudflare.com` → **esa la compartís**.
-   Mientras tu PC y el túnel estén prendidos, cualquiera entra desde ahí.
+### Pasos (un solo doble clic)
+1. Doble clic en **`Compartir Analizador.bat`**. Ese .bat solo:
+   - descarga `cloudflared` la primera vez (no hay que instalar nada),
+   - levanta el servidor,
+   - abre el túnel y muestra el **link público** `https://....trycloudflare.com`.
+2. Copiás ese link de la ventana y **lo compartís**. Mientras la ventana esté abierta,
+   cualquiera entra desde ahí.
+
+> El link cambia cada vez que reabrís el `.bat`, y tu PC tiene que estar prendida.
 
 ### La AI (OpenAI) — ya queda configurada
 No hay que hacer nada extra: la app usa la `OPENAI_API_KEY` de tu `backend/.env` local.

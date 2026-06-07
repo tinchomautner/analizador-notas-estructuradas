@@ -10,6 +10,9 @@ __pycache__/
 # Config local del entorno de dev (rutas absolutas de la máquina)
 .claude/
 
+# Binarios descargados (cloudflared para el link público)
+bin/
+
 # Sistema
 .DS_Store
 Thumbs.db
