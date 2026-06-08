@@ -383,7 +383,15 @@ def run_quant(terms: dict, mc_paths: int | None = None, seed: int | None = None)
     # Un ticker inválido puede venir como columna toda-NaN: lo tratamos como faltante.
     have = [t for t in tickers if t in close.columns and close[t].notna().any()]
     missing = [t for t in tickers if t not in have]
+    benchmark_ok = "^GSPC" in close.columns and close["^GSPC"].notna().any()
     if missing:
+        if not benchmark_ok:
+            # Ni el índice de referencia bajó → no es el ticker, es Yahoo.
+            raise ValueError(
+                "No se pudo conectar con Yahoo Finance desde este servidor (no bajó ni el índice de "
+                "referencia). Suele pasar en hosting cloud (Render y similares), donde Yahoo bloquea o "
+                "limita las IP de datacenter. Corré la app en local / por el link del túnel, donde sí funciona."
+            )
         raise ValueError(
             f"No se pudieron bajar datos de mercado de: {', '.join(missing)}. "
             "Revisá el ticker de Yahoo Finance en el paso de revisión "
