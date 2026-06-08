@@ -31,24 +31,37 @@ TRADING_DAYS = 252
 # Descarga de datos
 # --------------------------------------------------------------------------- #
 def _download(tickers: list[str], period: str = "max") -> pd.DataFrame:
+    """Descarga cierres ajustados. Reintenta los tickers que Yahoo devuelve vacíos
+    (rate-limiting intermitente, frecuente desde IPs cloud)."""
+    import time
     import yfinance as yf
 
-    data = yf.download(
-        tickers,
-        period=period,
-        interval="1d",
-        auto_adjust=True,  # ajustado por dividendos y splits ~ total return
-        progress=False,
-        group_by="column",
-        threads=True,
-    )
-    if isinstance(data.columns, pd.MultiIndex):
-        close = data["Close"].copy()
-    else:
-        close = data[["Close"]].copy()
-        close.columns = [tickers[0]]
-    close = close.dropna(how="all")
-    return close
+    def grab(ts: list[str]) -> pd.DataFrame:
+        try:
+            data = yf.download(ts, period=period, interval="1d", auto_adjust=True,
+                               progress=False, group_by="column", threads=True)
+        except Exception:  # noqa: BLE001
+            return pd.DataFrame()
+        if data is None or len(data) == 0:
+            return pd.DataFrame()
+        if isinstance(data.columns, pd.MultiIndex):
+            c = data["Close"].copy()
+        else:
+            c = data[["Close"]].copy()
+            c.columns = [ts[0]]
+        return c.dropna(axis=1, how="all").dropna(how="all")
+
+    close = grab(tickers)
+    missing = [t for t in tickers if t not in close.columns]
+    for _ in range(3):
+        if not missing:
+            break
+        time.sleep(1.5)  # respetar el rate-limit de Yahoo
+        extra = grab(missing)
+        if len(extra.columns):
+            close = close.join(extra, how="outer") if len(close.columns) else extra
+        missing = [t for t in tickers if t not in close.columns]
+    return close.dropna(how="all")
 
 
 def _annualized_vol(daily_log: pd.Series, window: int) -> float:
